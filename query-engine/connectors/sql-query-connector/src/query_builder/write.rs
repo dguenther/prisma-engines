@@ -154,6 +154,8 @@ pub fn update_many(model: &ModelRef, ids: &[&SelectionResult], args: WriteArgs) 
                     let e: Expression<'_> = Column::from(name.clone()).into();
                     e / field.value(rhs).into()
                 }
+
+                WriteExpression::CompositeWrite(_) => unreachable!("SQL Connectors do not support composite writes."),
             };
 
             acc.set(name, value)
