@@ -244,11 +244,11 @@ dependencies = [
 
 [[package]]
 name = "async-native-tls"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e9e7a929bd34c68a82d58a4de7f86fffdaf97fb2af850162a7bb19dd7269b33"
+checksum = "d57d4cec3c647232e1094dc013546c0b33ce785d8aeb251e1f20dfaf8a9a13fe"
 dependencies = [
- "async-std",
+ "futures-util",
  "native-tls",
  "thiserror",
  "url",
@@ -316,33 +316,12 @@ dependencies = [
 
 [[package]]
 name = "async-stream"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22068c0c19514942eefcfd4daf8976ef1aad84e61539f95cd200c35202f80af5"
-dependencies = [
- "async-stream-impl 0.2.1",
- "futures-core",
-]
-
-[[package]]
-name = "async-stream"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "171374e7e3b2504e0e5236e3b59260560f9fe94bfe9ac39ba5e4e929c5590625"
 dependencies = [
- "async-stream-impl 0.3.2",
+ "async-stream-impl",
  "futures-core",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25f9db3b38af870bf7e5cc649167533b493928e50744e2c30ae350230b414670"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -973,7 +952,6 @@ name = "datamodel-connector"
 version = "0.1.0"
 dependencies = [
  "diagnostics",
- "dml",
  "enumflags2",
  "parser-database",
  "serde_json",
@@ -1207,9 +1185,9 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fastrand"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b394ed3d285a429378d3b384b9eb1285267e7df4b166df24b7a6939a04dc392e"
+checksum = "779d043b6a0b90cc4c0ed7ee380a6504394cee7efd7db050e3774eee387324b2"
 dependencies = [
  "instant",
 ]
@@ -2127,12 +2105,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e6bcd6433cff03a4bfc3d9834d504467db1f1cf6d0ea765d37d330249ed629d"
 
 [[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
-
-[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2190,6 +2162,7 @@ dependencies = [
 name = "migration-engine-cli"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "backtrace",
  "base64 0.13.0",
  "connection-string",
@@ -2213,15 +2186,14 @@ dependencies = [
 name = "migration-engine-tests"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bigdecimal",
  "chrono",
  "connection-string",
  "datamodel",
- "datamodel-connector",
  "enumflags2",
  "expect-test",
  "indoc",
- "migration-connector",
  "migration-core",
  "once_cell",
  "pretty_assertions",
@@ -2340,7 +2312,6 @@ name = "mongodb-datamodel-connector"
 version = "0.1.0"
 dependencies = [
  "datamodel-connector",
- "dml",
  "enumflags2",
  "native-types",
  "once_cell",
@@ -2385,6 +2356,7 @@ dependencies = [
  "futures",
  "migration-connector",
  "mongodb",
+ "mongodb-datamodel-connector",
  "mongodb-schema-describer",
  "once_cell",
  "serde",
@@ -2521,9 +2493,9 @@ dependencies = [
 
 [[package]]
 name = "napi-build"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9584cc599cffd833a65527fb655bb65180f6ec8f26fba3081d2d989faa03bef"
+checksum = "ebd4419172727423cf30351406c54f6cc1b354a2cfb4f1dba3e6cd07f6d5522b"
 
 [[package]]
 name = "napi-derive"
@@ -3257,9 +3229,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qe-setup"
+version = "0.1.0"
+dependencies = [
+ "connection-string",
+ "datamodel",
+ "enumflags2",
+ "migration-core",
+ "mongodb",
+ "quaint",
+ "url",
+]
+
+[[package]]
 name = "quaint"
 version = "0.2.0-alpha.13"
-source = "git+https://github.com/prisma/quaint#05eb0acc841eeb88569d1538c35b66b5e4f83266"
+source = "git+https://github.com/prisma/quaint#85bb6a12159df0581350ddb9fb9e998070b8fc32"
 dependencies = [
  "async-trait",
  "base64 0.12.3",
@@ -3474,11 +3459,11 @@ dependencies = [
  "indoc",
  "itertools",
  "lazy_static",
- "migration-core",
  "mongodb-datamodel-connector",
  "nom",
  "parse-hyperlinks",
  "prisma-models",
+ "qe-setup",
  "query-core",
  "regex",
  "request-handlers",
@@ -3969,7 +3954,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0bccbcf40c8938196944a3da0e133e031a33f4d6b72db3bda3cc556e361905d"
 dependencies = [
  "lazy_static",
- "parking_lot 0.11.2",
+ "parking_lot 0.10.2",
  "serial_test_derive",
 ]
 
@@ -4039,9 +4024,9 @@ dependencies = [
 
 [[package]]
 name = "signal-hook"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c35dfd12afb7828318348b8c408383cf5071a086c1d4ab1c0f9840ec92dbb922"
+checksum = "647c97df271007dcea485bb74ffdb57f2e683f1306c854f468a0c244badabf2d"
 dependencies = [
  "libc",
  "signal-hook-registry",
@@ -4130,7 +4115,6 @@ name = "sql-datamodel-connector"
 version = "0.1.0"
 dependencies = [
  "datamodel-connector",
- "dml",
  "enumflags2",
  "native-types",
  "once_cell",
@@ -4181,13 +4165,11 @@ dependencies = [
  "chrono",
  "connection-string",
  "datamodel",
- "datamodel-connector",
  "enumflags2",
  "indoc",
  "migration-connector",
  "native-types",
  "once_cell",
- "prisma-value",
  "quaint",
  "regex",
  "serde_json",
@@ -4510,12 +4492,11 @@ dependencies = [
 
 [[package]]
 name = "tiberius"
-version = "0.6.4"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa12e58f1ede91b897b3e6d399f09dd5ee1f6d44d8162b61e1b53032b9976fb6"
+checksum = "00035fdbcee3e791e756d1831a1b9a89e414c320d3eccdae65aba4f388216c30"
 dependencies = [
  "async-native-tls",
- "async-stream 0.2.1",
  "async-trait",
  "asynchronous-codec",
  "bigdecimal",
@@ -4775,7 +4756,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ac42cd97ac6bd2339af5bcabf105540e21e45636ec6fa6aae5e85d44db31be0"
 dependencies = [
- "async-stream 0.3.2",
+ "async-stream",
  "base64 0.13.0",
  "bytes",
  "futures-core",
@@ -4796,7 +4777,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "796c5e1cd49905e65dd8e700d4cb1dffcbfdb4fc9d017de08c1a537afd83627c"
 dependencies = [
- "async-stream 0.3.2",
+ "async-stream",
  "async-trait",
  "base64 0.13.0",
  "bytes",
@@ -5056,7 +5037,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "rand 0.8.4",
  "static_assertions",
 ]
@@ -5196,7 +5177,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.3",
- "md5 0.7.0",
  "serde",
 ]
 
@@ -5416,7 +5396,7 @@ checksum = "8f820cd208ce9c6b050812dc2d724ba98c6c1e9db5ce9b3f58d925ae5723a5e6"
 dependencies = [
  "bitflags",
  "byteorder",
- "md5 0.6.1",
+ "md5",
  "rand 0.7.3",
  "winapi",
 ]

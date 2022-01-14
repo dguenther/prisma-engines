@@ -75,6 +75,10 @@ impl SqlFlavour for SqliteFlavour {
         Ok(connection.raw_cmd(sql).await?)
     }
 
+    fn datamodel_connector(&self) -> &'static dyn datamodel::datamodel_connector::Connector {
+        sql_datamodel_connector::SQLITE
+    }
+
     async fn drop_database(&self, database_url: &str) -> ConnectorResult<()> {
         let file_path = match ConnectionInfo::from_url(database_url) {
             Ok(ConnectionInfo::Sqlite { file_path, .. }) => file_path,
@@ -96,16 +100,6 @@ impl SqlFlavour for SqliteFlavour {
     }
 
     async fn ensure_connection_validity(&self, _connection: &Connection) -> ConnectorResult<()> {
-        Ok(())
-    }
-
-    async fn qe_setup(&self, _database_url: &str) -> ConnectorResult<()> {
-        use std::fs::File;
-        File::create(&self.file_path).expect("Failed to truncate SQLite database");
-        Ok(())
-    }
-
-    async fn qe_teardown(&self, _database_str: &str) -> ConnectorResult<()> {
         Ok(())
     }
 

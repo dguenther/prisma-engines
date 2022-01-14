@@ -3,12 +3,14 @@ use datamodel_connector::{
     helper::{args_vec_from_opt, parse_one_opt_u32, parse_one_u32, parse_two_opt_u32},
     parser_database::walkers::ModelWalker,
     walker_ext_traits::*,
-    Connector, ConnectorCapability, ConstraintScope, NativeTypeConstructor, ReferentialAction, ReferentialIntegrity,
-    ScalarType,
+    Connector, ConnectorCapability, ConstraintScope, Diagnostics, NativeTypeConstructor, NativeTypeInstance,
+    ReferentialAction, ReferentialIntegrity, ScalarType,
 };
-use dml::native_type_instance::NativeTypeInstance;
 use enumflags2::BitFlags;
-use native_types::MySqlType::{self, *};
+use native_types::{
+    MySqlType::{self, *},
+    NativeType,
+};
 
 const INT_TYPE_NAME: &str = "Int";
 const UNSIGNED_INT_TYPE_NAME: &str = "UnsignedInt";
@@ -111,6 +113,7 @@ const CAPABILITIES: &[ConnectorCapability] = &[
     ConnectorCapability::AdvancedJsonNullability,
     ConnectorCapability::IndexColumnLengthPrefixing,
     ConnectorCapability::FullTextIndex,
+    ConnectorCapability::FullTextSearchWithIndex,
     ConnectorCapability::MultipleFullTextAttributesPerModel,
 ];
 
@@ -139,7 +142,7 @@ impl Connector for MySqlDatamodelConnector {
         CAPABILITIES
     }
 
-    fn constraint_name_length(&self) -> usize {
+    fn max_identifier_length(&self) -> usize {
         64
     }
 
@@ -224,7 +227,8 @@ impl Connector for MySqlDatamodelConnector {
         scalar_type: &ScalarType,
         errors: &mut Vec<ConnectorError>,
     ) {
-        let native_type: MySqlType = native_type_instance.deserialize_native_type();
+        let native_type: MySqlType =
+            serde_json::from_value(native_type_instance.serialized_native_type.clone()).unwrap();
         let error = self.native_instance_error(native_type_instance);
 
         match native_type {
@@ -253,7 +257,14 @@ impl Connector for MySqlDatamodelConnector {
         }
     }
 
-    fn validate_model(&self, model: ModelWalker<'_, '_>, errors: &mut Vec<ConnectorError>) {
+    fn validate_model(&self, model: ModelWalker<'_, '_>, errors: &mut Diagnostics) {
+        let mut push_error = |err: ConnectorError| {
+            errors.push_error(datamodel_connector::DatamodelError::ConnectorError {
+                message: err.to_string(),
+                span: model.ast_model().span,
+            });
+        };
+
         for index in model.indexes() {
             for field in index.scalar_field_attributes() {
                 if let Some(native_type) = field.as_scalar_field().native_type_instance(self) {
@@ -268,14 +279,14 @@ impl Connector for MySqlDatamodelConnector {
                         }
 
                         if index.is_unique() {
-                            errors.push(
+                            push_error(
                                 self.native_instance_error(&native_type)
-                                    .new_incompatible_native_type_with_unique(),
+                                    .new_incompatible_native_type_with_unique(" If you are using the `extendedIndexes` preview feature you can add a `length` argument to allow this."),
                             )
                         } else {
-                            errors.push(
+                            push_error(
                                 self.native_instance_error(&native_type)
-                                    .new_incompatible_native_type_with_index(),
+                                    .new_incompatible_native_type_with_index(" If you are using the `extendedIndexes` preview feature you can add a `length` argument to allow this."),
                             )
                         };
 
@@ -296,9 +307,9 @@ impl Connector for MySqlDatamodelConnector {
                             continue;
                         }
 
-                        errors.push(
+                        push_error(
                             self.native_instance_error(&native_type_instance)
-                                .new_incompatible_native_type_with_id(),
+                                .new_incompatible_native_type_with_id(" If you are using the `extendedIndexes` preview feature you can add a `length` argument to allow this."),
                         );
 
                         break;
@@ -355,7 +366,7 @@ impl Connector for MySqlDatamodelConnector {
             _ => return Err(ConnectorError::new_native_type_parser_error(name)),
         };
 
-        Ok(NativeTypeInstance::new(name, cloned_args, &native_type))
+        Ok(NativeTypeInstance::new(name, cloned_args, native_type.to_json()))
     }
 
     fn introspect_native_type(&self, native_type: serde_json::Value) -> Result<NativeTypeInstance, ConnectorError> {
@@ -403,7 +414,7 @@ impl Connector for MySqlDatamodelConnector {
         }
 
         if let Some(constructor) = self.find_native_type_constructor(constructor_name) {
-            Ok(NativeTypeInstance::new(constructor.name, args, &native_type))
+            Ok(NativeTypeInstance::new(constructor.name, args, native_type.to_json()))
         } else {
             Err(self.native_str_error(constructor_name).native_type_name_unknown())
         }

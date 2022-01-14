@@ -351,10 +351,10 @@ fn read_scalar_value(bson: Bson, meta: &ScalarOutputMeta) -> crate::Result<Prism
         (TypeIdentifier::Json, bson) => PrismaValue::Json(serde_json::to_string(&bson.into_relaxed_extjson())?),
 
         (ident, bson) => {
-            return Err(MongoError::UnhandledError(format!(
-                "Converting BSON to type {:?}. Data: {:?}",
-                ident, bson
-            )))
+            return Err(MongoError::ConversionError {
+                from: bson.to_string(),
+                to: format!("{:?}", ident),
+            })
         }
     };
 

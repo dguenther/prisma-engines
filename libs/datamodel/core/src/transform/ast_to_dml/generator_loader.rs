@@ -1,11 +1,9 @@
+use parser_database::ast;
+
 use super::super::helpers::*;
 use crate::{
-    ast::{self, Span, WithSpan},
-    common::preview_features::GENERATOR,
-    configuration::Generator,
-    diagnostics::*,
-    transform::ast_to_dml::common::parse_and_validate_preview_features,
-    StringFromEnvVar,
+    ast::WithSpan, common::preview_features::GENERATOR, configuration::Generator, diagnostics::*,
+    transform::ast_to_dml::common::parse_and_validate_preview_features, StringFromEnvVar,
 };
 use std::{collections::HashMap, convert::TryFrom};
 
@@ -14,6 +12,8 @@ const OUTPUT_KEY: &str = "output";
 const BINARY_TARGETS_KEY: &str = "binaryTargets";
 const EXPERIMENTAL_FEATURES_KEY: &str = "experimentalFeatures";
 const PREVIEW_FEATURES_KEY: &str = "previewFeatures";
+const ENGINE_TYPE_KEY: &str = "engineType";
+
 const FIRST_CLASS_PROPERTIES: &[&str] = &[
     PROVIDER_KEY,
     OUTPUT_KEY,
@@ -44,6 +44,17 @@ impl GeneratorLoader {
             .iter()
             .map(|arg| (arg.name.name.as_str(), ValueValidator::new(&arg.value)))
             .collect();
+
+        if let Some(expr) = args.get(ENGINE_TYPE_KEY) {
+            if !expr.value.is_string() {
+                diagnostics.push_error(DatamodelError::new_type_mismatch_error(
+                    "String",
+                    expr.value.describe_value_type(),
+                    &expr.value.to_string(),
+                    expr.span(),
+                ))
+            }
+        }
 
         let provider = match args.get(PROVIDER_KEY) {
             Some(val) => match StringFromEnvVar::try_from(val.value) {
@@ -95,22 +106,18 @@ impl GeneratorLoader {
             .or_else(|| args.get(EXPERIMENTAL_FEATURES_KEY))
             .map(|v| (v.as_array().to_str_vec(), v.span()));
 
-        let (raw_preview_features, span) = match preview_features_arg {
-            Some((Ok(arr), span)) => (arr, span),
-            Some((Err(err), span)) => {
-                diagnostics.push_error(err);
-                (Vec::new(), span)
+        let preview_features = match preview_features_arg {
+            Some((Ok(arr), span)) => {
+                let (features, mut diag) = parse_and_validate_preview_features(arr, &GENERATOR, span);
+                diagnostics.append(&mut diag);
+
+                Some(features)
             }
-            None => (Vec::new(), Span::empty()),
-        };
-
-        let preview_features = if !raw_preview_features.is_empty() {
-            let (features, mut diag) = parse_and_validate_preview_features(raw_preview_features, &GENERATOR, span);
-            diagnostics.append(&mut diag);
-
-            features
-        } else {
-            vec![]
+            Some((Err(err), _)) => {
+                diagnostics.push_error(err);
+                None
+            }
+            None => None,
         };
 
         for prop in &ast_generator.properties {
@@ -125,7 +132,6 @@ impl GeneratorLoader {
                 ast::Expression::ConstantValue(val, _) => val.clone(),
                 ast::Expression::Function(_, _, _) => String::from("(function)"),
                 ast::Expression::Array(_, _) => String::from("(array)"),
-                ast::Expression::FieldWithArgs(_, _, _) => String::from("(field with args)"),
             };
 
             properties.insert(prop.name.name.clone(), value);

@@ -86,9 +86,7 @@ impl<'a> LowerDmlToAst<'a> {
                 let mut args = Vec::new();
                 let pk = model.primary_key.as_ref().unwrap();
                 if let Some(src) = self.datasource {
-                    if pk.db_name.is_some()
-                        && !ConstraintNames::primary_key_name_matches(pk, model, &*src.active_connector)
-                    {
+                    if pk.db_name.is_some() && !super::primary_key_name_matches(pk, model, &*src.active_connector) {
                         args.push(ast::Argument::new(
                             "map",
                             ast::Expression::StringValue(String::from(pk.db_name.as_ref().unwrap()), Span::empty()),
@@ -134,10 +132,9 @@ impl<'a> LowerDmlToAst<'a> {
 
         // @default
         if let Some(default_value) = field.default_value() {
-            let mut args = vec![ast::Argument::new(
-                "",
-                LowerDmlToAst::<'a>::lower_default_value(default_value.clone()),
-            )];
+            let mut args = vec![ast::Argument::new_unnamed(LowerDmlToAst::<'a>::lower_default_value(
+                default_value.clone(),
+            ))];
 
             let connector = self
                 .datasource
@@ -177,7 +174,10 @@ impl<'a> LowerDmlToAst<'a> {
                 == RelationNames::name_for_unambiguous_relation(&relation_info.to, &parent_model.name);
 
             if !relation_info.name.is_empty() && (!has_default_name || parent_model.name == related_model.name) {
-                args.push(ast::Argument::new_string("", relation_info.name.to_string()));
+                args.push(ast::Argument::new_unnamed(ast::Expression::StringValue(
+                    relation_info.name.to_string(),
+                    ast::Span::empty(),
+                )));
             }
 
             let mut relation_fields = relation_info.references.clone();
@@ -225,7 +225,7 @@ impl<'a> LowerDmlToAst<'a> {
 
             if let Some(fk_name) = &relation_info.fk_name {
                 if let Some(src) = self.datasource {
-                    if !ConstraintNames::foreign_key_name_matches(relation_info, model, &*src.active_connector) {
+                    if !super::foreign_key_name_matches(relation_info, model, &*src.active_connector) {
                         args.push(ast::Argument::new(
                             "map",
                             ast::Expression::StringValue(String::from(fk_name), Span::empty()),
@@ -251,8 +251,20 @@ impl<'a> LowerDmlToAst<'a> {
         match dv.kind() {
             dml::DefaultKind::Single(v) => LowerDmlToAst::<'a>::lower_prisma_value(v),
             dml::DefaultKind::Expression(e) => {
-                let exprs = e.args().iter().map(LowerDmlToAst::<'a>::lower_prisma_value).collect();
-                ast::Expression::Function(e.name().to_string(), exprs, ast::Span::empty())
+                let arguments = e
+                    .args()
+                    .iter()
+                    .map(LowerDmlToAst::<'a>::lower_prisma_value)
+                    .map(ast::Argument::new_unnamed)
+                    .collect();
+                ast::Expression::Function(
+                    e.name().to_string(),
+                    ast::ArgumentsList {
+                        arguments,
+                        ..Default::default()
+                    },
+                    ast::Span::empty(),
+                )
             }
         }
     }

@@ -64,7 +64,7 @@ pub(super) fn has_a_unique_primary_key_name(
 ) {
     let (pk, name): (PrimaryKeyWalker<'_, '_>, Cow<'_, str>) = match model
         .primary_key()
-        .and_then(|pk| pk.final_database_name(ctx.connector).map(|name| (pk, name)))
+        .and_then(|pk| pk.constraint_name(ctx.connector).map(|name| (pk, name)))
     {
         Some((pk, name)) => (pk, name),
         None => return,
@@ -78,7 +78,7 @@ pub(super) fn has_a_unique_primary_key_name(
         !pk.is_defined_on_field(),
     );
 
-    for violation in names.constraint_namespace.scope_violations(
+    for violation in names.constraint_namespace.constraint_name_scope_violations(
         model.model_id(),
         super::constraint_namespace::ConstraintName::PrimaryKey(name.as_ref()),
     ) {
@@ -94,6 +94,38 @@ pub(super) fn has_a_unique_primary_key_name(
             .unwrap_or_else(|| pk.ast_attribute().span);
 
         ctx.push_error(DatamodelError::new_attribute_validation_error(&message, "id", span));
+    }
+}
+
+/// The custom name argument makes its way into the generated client API. Therefore the name argument
+/// needs to be unique per model. It can be found on the primary key or unique indexes.
+pub(super) fn has_a_unique_custom_primary_key_name_per_model(
+    model: ModelWalker<'_, '_>,
+    names: &super::Names<'_>,
+    ctx: &mut Context<'_>,
+) {
+    let pk = match model.primary_key() {
+        Some(pk) => pk,
+        None => return,
+    };
+
+    if let Some(name) = pk.name() {
+        if names
+            .constraint_namespace
+            .local_custom_name_scope_violations(model.model_id(), name.as_ref())
+        {
+            let message = format!(
+                "The given custom name `{}` has to be unique on the model. Please provide a different name for the `name` argument.",
+                name,
+            );
+
+            let span = pk
+                .ast_attribute()
+                .span_for_argument("name")
+                .unwrap_or_else(|| pk.ast_attribute().span);
+
+            ctx.push_error(DatamodelError::new_attribute_validation_error(&message, "@id", span));
+        }
     }
 }
 
@@ -221,15 +253,7 @@ pub(crate) fn primary_key_connector_specific(model: ModelWalker<'_, '_>, ctx: &m
 }
 
 pub(super) fn connector_specific(model: ModelWalker<'_, '_>, ctx: &mut Context<'_>) {
-    let mut errors = Vec::new();
-    ctx.connector.validate_model(model, &mut errors);
-
-    for error in errors {
-        ctx.push_error(DatamodelError::new_connector_error(
-            &error.to_string(),
-            model.ast_model().span,
-        ));
-    }
+    ctx.connector.validate_model(model, ctx.diagnostics)
 }
 
 pub(super) fn id_has_fields(model: ModelWalker<'_, '_>, ctx: &mut Context<'_>) {

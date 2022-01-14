@@ -126,6 +126,10 @@ impl SqlFlavour for MssqlFlavour {
         super::generic_apply_migration_script(migration_name, script, conn).await
     }
 
+    fn datamodel_connector(&self) -> &'static dyn datamodel::datamodel_connector::Connector {
+        sql_datamodel_connector::MSSQL
+    }
+
     fn migrations_table(&self) -> Table<'_> {
         (self.schema_name(), self.migrations_table_name()).into()
     }
@@ -322,38 +326,6 @@ impl SqlFlavour for MssqlFlavour {
         connection.raw_cmd(&drop_tables).await?;
         connection.raw_cmd(&drop_types).await?;
 
-        Ok(())
-    }
-
-    async fn qe_setup(&self, database_str: &str) -> ConnectorResult<()> {
-        let (db_name, master_uri) = Self::master_url(database_str)?;
-        let conn = connect(&master_uri).await?;
-
-        // Without these, our poor connection gets deadlocks if other schemas
-        // are modified while we introspect.
-        let allow_snapshot_isolation = format!(
-            "ALTER DATABASE [{db_name}] SET ALLOW_SNAPSHOT_ISOLATION ON",
-            db_name = db_name
-        );
-
-        conn.raw_cmd(&allow_snapshot_isolation).await.unwrap();
-
-        self.reset(&conn).await?;
-
-        conn.raw_cmd(&format!(
-            "DROP SCHEMA IF EXISTS {}",
-            conn.connection_info().schema_name()
-        ))
-        .await?;
-
-        conn.raw_cmd(&format!("CREATE SCHEMA {}", conn.connection_info().schema_name(),))
-            .await
-            .unwrap();
-
-        Ok(())
-    }
-
-    async fn qe_teardown(&self, _database_str: &str) -> ConnectorResult<()> {
         Ok(())
     }
 

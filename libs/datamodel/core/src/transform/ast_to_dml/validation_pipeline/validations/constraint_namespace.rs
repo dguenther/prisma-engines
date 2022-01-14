@@ -10,21 +10,25 @@ use std::{borrow::Cow, collections::HashMap, ops::Deref};
 pub(crate) struct ConstraintNamespace<'ast> {
     global: HashMap<(ConstraintScope, Cow<'ast, str>), usize>,
     local: HashMap<(ast::ModelId, ConstraintScope, Cow<'ast, str>), usize>,
+    local_custom_name: HashMap<(ast::ModelId, Cow<'ast, str>), usize>,
 }
 
 impl<'ast> ConstraintNamespace<'ast> {
     /// An iterator of namespace violations with the given name, first globally followed up with
     /// local violations in the given model.
-    pub(crate) fn scope_violations(
+    pub(crate) fn constraint_name_scope_violations(
         &self,
         model_id: ast::ModelId,
         name: ConstraintName<'ast>,
     ) -> impl Iterator<Item = &'ast ConstraintScope> + '_ {
-        self.global_scope_violations(name)
-            .chain(self.local_scope_violations(model_id, name))
+        self.global_constraint_name_scope_violations(name)
+            .chain(self.local_constraint_name_scope_violations(model_id, name))
     }
 
-    fn global_scope_violations(&self, name: ConstraintName<'ast>) -> impl Iterator<Item = &'ast ConstraintScope> + '_ {
+    fn global_constraint_name_scope_violations(
+        &self,
+        name: ConstraintName<'ast>,
+    ) -> impl Iterator<Item = &'ast ConstraintScope> + '_ {
         name.possible_scopes().filter(
             move |scope| match self.global.get(&(**scope, Cow::from(name.as_ref()))) {
                 Some(count) => *count > 1,
@@ -33,7 +37,7 @@ impl<'ast> ConstraintNamespace<'ast> {
         )
     }
 
-    fn local_scope_violations(
+    fn local_constraint_name_scope_violations(
         &self,
         model_id: ast::ModelId,
         name: ConstraintName<'ast>,
@@ -46,6 +50,13 @@ impl<'ast> ConstraintNamespace<'ast> {
         })
     }
 
+    pub(crate) fn local_custom_name_scope_violations(&self, model_id: ast::ModelId, name: &'ast str) -> bool {
+        match self.local_custom_name.get(&(model_id, Cow::from(name))) {
+            Some(count) => *count > 1,
+            None => false,
+        }
+    }
+
     /// Add all index and unique constraints from the data model to a global validation scope.
     pub(super) fn add_global_indexes(
         &mut self,
@@ -56,7 +67,7 @@ impl<'ast> ConstraintNamespace<'ast> {
         for index in db.walk_models().flat_map(|m| m.indexes()) {
             let counter = self
                 .global
-                .entry((scope, index.final_database_name(connector)))
+                .entry((scope, index.constraint_name(connector)))
                 .or_default();
             *counter += 1;
         }
@@ -87,7 +98,7 @@ impl<'ast> ConstraintNamespace<'ast> {
         scope: ConstraintScope,
     ) {
         for model in db.walk_models() {
-            if let Some(name) = model.primary_key().and_then(|k| k.final_database_name(connector)) {
+            if let Some(name) = model.primary_key().and_then(|k| k.constraint_name(connector)) {
                 let counter = self.global.entry((scope, name)).or_default();
                 *counter += 1;
             }
@@ -125,7 +136,7 @@ impl<'ast> ConstraintNamespace<'ast> {
             for index in model.indexes() {
                 let counter = self
                     .local
-                    .entry((model.model_id(), scope, index.final_database_name(connector)))
+                    .entry((model.model_id(), scope, index.constraint_name(connector)))
                     .or_default();
 
                 *counter += 1;
@@ -141,9 +152,31 @@ impl<'ast> ConstraintNamespace<'ast> {
         scope: ConstraintScope,
     ) {
         for model in db.walk_models() {
-            if let Some(name) = model.primary_key().and_then(|pk| pk.final_database_name(connector)) {
+            if let Some(name) = model.primary_key().and_then(|pk| pk.constraint_name(connector)) {
                 let counter = self.local.entry((model.model_id(), scope, name)).or_default();
                 *counter += 1;
+            }
+        }
+    }
+
+    /// Add all primary key and unique index custom names to separate namespaces per model.
+    pub(super) fn add_local_custom_names_for_primary_keys_and_uniques(&mut self, db: &ParserDatabase<'ast>) {
+        for model in db.walk_models() {
+            if let Some(name) = model.primary_key().and_then(|pk| pk.name()) {
+                let counter = self
+                    .local_custom_name
+                    .entry((model.model_id(), Cow::from(name)))
+                    .or_default();
+                *counter += 1;
+            }
+            for index in model.indexes() {
+                if let Some(name) = index.name() {
+                    let counter = self
+                        .local_custom_name
+                        .entry((model.model_id(), Cow::from(name)))
+                        .or_default();
+                    *counter += 1;
+                }
             }
         }
     }

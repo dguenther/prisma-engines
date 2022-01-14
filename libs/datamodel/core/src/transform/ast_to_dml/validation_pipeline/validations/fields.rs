@@ -71,7 +71,7 @@ pub(super) fn has_a_unique_default_constraint_name(
 
     for violation in names
         .constraint_namespace
-        .scope_violations(field.model().model_id(), ConstraintName::Default(name.as_ref()))
+        .constraint_name_scope_violations(field.model().model_id(), ConstraintName::Default(name.as_ref()))
     {
         let message = format!(
             "The given constraint name `{}` has to be unique in the following namespace: {}. Please provide a different name using the `map` argument.",
@@ -323,27 +323,6 @@ pub(super) fn validate_default(field: ScalarFieldWalker<'_, '_>, ctx: &mut Conte
         }
         _ => (),
     }
-
-    // Connector-specific validations.
-
-    let mut errors = Vec::new();
-    let default = field.default_value().map(|d| d.dml_default_kind());
-
-    if field.raw_native_type().is_none() {
-        ctx.connector.validate_field_default_without_native_type(
-            field.name(),
-            &scalar_type,
-            default.as_ref(),
-            &mut errors,
-        );
-    }
-
-    for error in errors {
-        ctx.push_error(DatamodelError::ConnectorError {
-            message: error.to_string(),
-            span: field.ast_field().span,
-        });
-    }
 }
 
 pub(super) fn validate_scalar_field_connector_specific(field: ScalarFieldWalker<'_, '_>, ctx: &mut Context<'_>) {
@@ -354,10 +333,10 @@ pub(super) fn validate_scalar_field_connector_specific(field: ScalarFieldWalker<
         if !ctx.connector.supports_json() {
             ctx.push_error(DatamodelError::new_field_validation_error(
                 &format!(
-                "Field `{}` in model `{}` can't be of type Json. The current connector does not support the Json type.",
-                field.name(),
-                field.model().name(),
-            ),
+                    "Field `{}` in model `{}` can't be of type Json. The current connector does not support the Json type.",
+                    field.name(),
+                    field.model().name(),
+                ),
                 field.model().name(),
                 field.name(),
                 field.ast_field().span,
@@ -424,7 +403,7 @@ pub(super) fn validate_unsupported_field_type(field: ScalarFieldWalker<'_, '_>, 
 
             let msg = format!(
                         "The type `Unsupported(\"{}\")` you specified in the type definition for the field `{}` is supported as a native type by Prisma. Please use the native type notation `{} @{}.{}` for full support.",
-                        unsupported_lit, field.name(), prisma_type.as_str(), &source.name, native_type.render()
+                        unsupported_lit, field.name(), prisma_type.as_str(), &source.name, native_type
                     );
 
             ctx.push_error(DatamodelError::new_validation_error(msg, field.ast_field().span));
